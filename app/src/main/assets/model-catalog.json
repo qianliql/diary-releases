@@ -1,0 +1,9 @@
+{
+  "version": "whisper-tiny-int8-v1",
+  "name": "Whisper tiny · 普通话离线转写",
+  "size": 60746423,
+  "unpackedSize": 103611782,
+  "sha256": "8256787f31e01de63025c63f9db3d16eb3342010a59ec4ff21e9c2e481b3da0a",
+  "url": "https://github.com/qianliql/diary-releases/releases/download/models-v1/whisper-tiny-int8-v1.zip",
+  "license": "MIT · OpenAI Whisper；Apache-2.0 · sherpa-onnx"
+}

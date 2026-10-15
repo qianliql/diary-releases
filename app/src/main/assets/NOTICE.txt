@@ -1,0 +1,37 @@
+日记 1.0
+
+本应用不收集日记内容、使用统计或崩溃日志。日记和语音转写在本机处理。只有主动检查更新或加装模型时会访问 GitHub。
+
+AndroidX / Jetpack Compose / Kotlin Coroutines
+Apache License 2.0，版权归各项目作者所有。
+https://www.apache.org/licenses/LICENSE-2.0
+
+sherpa-onnx 1.13.8
+Copyright 2022-2026 Xiaomi Corporation and contributors.
+Apache License 2.0
+https://github.com/k2-fsa/sherpa-onnx
+
+Whisper（可选模型，不包含在基础应用中）
+Copyright (c) 2022 OpenAI
+MIT License
+Whisper 的代码和模型权重以 MIT 许可发布。
+ONNX 转换来自 sherpa-onnx 项目。
+https://github.com/openai/whisper
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
