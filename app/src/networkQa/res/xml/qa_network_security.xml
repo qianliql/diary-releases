@@ -1,0 +1,5 @@
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- Fault injection server is confined to this separate test APK and this device. -->
+    <domain-config cleartextTrafficPermitted="true"><domain>127.0.0.1</domain></domain-config>
+</network-security-config>

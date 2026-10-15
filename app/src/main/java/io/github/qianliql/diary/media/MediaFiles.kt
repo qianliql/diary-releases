@@ -2,11 +2,15 @@ package io.github.qianliql.diary.media
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.media.*
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import io.github.qianliql.diary.backup.hashStream
 import io.github.qianliql.diary.data.Block
 import io.github.qianliql.diary.data.BlockType
@@ -17,11 +21,44 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 object MediaFiles {
-    fun cameraUri(context: Context): Uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, "日记_${System.currentTimeMillis()}.jpg"); put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg"); put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/日记"); put(MediaStore.Images.Media.IS_PENDING, 1) }) ?: error("无法创建照片")
-    fun finishCamera(context: Context, uri: Uri, success: Boolean) {
-        if (success) context.contentResolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
-        else context.contentResolver.delete(uri, null, null)
+    fun cameraUri(context: Context): Uri {
+        val root = File(context.filesDir, "camera").apply { check(mkdirs() || isDirectory) }
+        val file = File.createTempFile("capture-", ".jpg", root)
+        return FileProvider.getUriForFile(context, "${context.packageName}.camera", file)
+    }
+    private fun captureFile(context: Context, uri: Uri): File {
+        require(uri.authority == "${context.packageName}.camera" && uri.pathSegments.size == 2 && uri.pathSegments.first() == "capture")
+        val root = File(context.filesDir, "camera").canonicalFile
+        return File(root, uri.lastPathSegment!!).canonicalFile.also { require(it.parentFile == root) }
+    }
+    fun finishCamera(context: Context, uri: Uri, success: Boolean): CameraPhoto? {
+        val file = captureFile(context, uri)
+        context.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        if (!success) { file.delete(); return null }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) { file.delete(); error("相机没有保存有效照片，请重新拍照") }
+        val resolver = context.contentResolver
+        var gallery: Uri? = null
+        try {
+            gallery = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "日记_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/日记")
+                put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis())
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }) ?: error("无法创建相册照片")
+            ParcelFileDescriptor.AutoCloseOutputStream(resolver.openFileDescriptor(gallery, "w")!!).use { output ->
+                file.inputStream().use { it.copyTo(output) }; output.fd.sync()
+            }
+            check(resolver.update(gallery, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null) == 1)
+            file.delete()
+            return CameraPhoto(gallery, true)
+        } catch (_: Exception) {
+            gallery?.let { runCatching { resolver.delete(it, null, null) } }
+            // Keep a readable original in the diary when gallery storage is temporarily unavailable.
+            return CameraPhoto(Uri.fromFile(file), false)
+        }
     }
     fun block(context: Context, uri: Uri, type: BlockType, duration: Long = 0): Block {
         val hash = context.contentResolver.openInputStream(uri)!!.use(::hashStream)
@@ -29,12 +66,11 @@ object MediaFiles {
     }
     fun bitmap(context: Context, uri: String, max: Int = 1600): Bitmap? = runCatching {
         val parsed = Uri.parse(uri)
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(parsed)?.use { BitmapFactory.decodeStream(it, null, options) }
-        if (options.outWidth <= 0) return@runCatching null
-        var sample = 1
-        while (options.outWidth / sample > max * 2 || options.outHeight / sample > max * 2) sample *= 2
-        context.contentResolver.openInputStream(parsed)?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, parsed)) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val scale = minOf(1.0, max.toDouble() / maxOf(info.size.width, info.size.height))
+            decoder.setTargetSize(maxOf(1, (info.size.width * scale).toInt()), maxOf(1, (info.size.height * scale).toInt()))
+        }
     }.getOrNull()
 }
 
@@ -49,6 +85,7 @@ class WavRecorder(private val context: Context) {
     val isRecording: Boolean get() = running.get()
     fun start() {
         check(!running.get())
+        check(context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) { "请先允许麦克风权限" }
         val root = File(context.noBackupFilesDir, "media").apply { mkdirs() }
         val target = File(root, "${UUID.randomUUID()}.wav")
         val minimum = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)

@@ -1,4 +1,4 @@
-# 日记 0.0.1
+# 日记 0.0.2
 
 面向 ColorOS 手机的原生 Android 个人日记，Android 12+，Kotlin + Jetpack Compose + 本机 SQLite。
 
@@ -29,6 +29,10 @@
 4. 发布构建：`gradlew.bat assembleRelease -PtargetAbi=arm64-v8a`。`signing.properties` 包含 `storeFile`、`storePassword`、`keyAlias`、`keyPassword`，必须使用同一把私有密钥持续签名。密钥与本机配置不在源代码压缩包中。
 
 调试构建为独立的“日记·测试”（包名后缀 `.qa`），不具备 INTERNET 权限，可在手机 Wi-Fi 正常连接时验证本地功能。模型测试通过 USB 手动放入已校验的模型，测试后删除；设置里的在线安装须在正式版验证。
+
+下载故障测试使用独立“日记·下载测试”（`.networkqa`）：`assembleNetworkQa assembleNetworkQaAndroidTest -PnetworkTests=true`。仅此构建允许 `127.0.0.1` 明文连接以模拟中断、阻塞与损坏；正式版仍只允许 HTTPS。测试模型为合成校验文件，不用于识别。`CameraCaptureTest` 的辅助相机运行在测试 APK 的另一 UID，验证临时文件授权和相册发布。
+
+0.0.2 修复 ColorOS 相机不能写入应用所有的待发布相册项目：通过受限 FileProvider 授权单个临时文件，拍照成功后由日记写入并发布 MediaStore；取消不留空相册图片。先保存草稿并记住所属日记，恢复后将照片写回原草稿。照片预览与 PDF 读取 EXIF 方向并限制解码尺寸。相册暂时无法保存时保留应用内原图并提示。模型取消会关闭阻塞连接，连续点击安装不会排队重复下载。
 
 ## 每次版本同步发布
 

@@ -8,8 +8,8 @@ android {
         applicationId = "io.github.qianliql.diary"
         minSdk = 31
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.0.1"
+        versionCode = 3
+        versionName = "0.0.2"
         resValue("string", "app_name", "日记")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += (providers.gradleProperty("targetAbi").orNull?.split(",") ?: listOf("arm64-v8a", "x86_64")) }
@@ -20,8 +20,10 @@ android {
     }
     buildTypes {
         debug { applicationIdSuffix = ".qa"; resValue("string", "app_name", "日记·测试") }
+        create("networkQa") { initWith(getByName("debug")); applicationIdSuffix = ".networkqa"; resValue("string", "app_name", "日记·下载测试"); matchingFallbacks += "debug" }
         release { isMinifyEnabled = true; isShrinkResources = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"); if (signing.isNotEmpty()) signingConfig = signingConfigs.getByName("release") }
     }
+    testBuildType = if (providers.gradleProperty("networkTests").orNull == "true") "networkQa" else "debug"
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }

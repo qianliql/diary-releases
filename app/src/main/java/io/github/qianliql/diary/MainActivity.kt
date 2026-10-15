@@ -37,7 +37,6 @@ class MainActivity : ComponentActivity() {
     val context = LocalContext.current
     val entries by vm.entries.collectAsState()
     val snack = remember { SnackbarHostState() }
-    var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var backupPassword by remember { mutableStateOf<CharArray?>(null) }
     var backupSnapshot by remember { mutableStateOf<List<Entry>>(emptyList()) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
@@ -50,13 +49,7 @@ class MainActivity : ComponentActivity() {
         catch (e: Exception) { vm.notify(e.message ?: "录音未保存") }
         recording = false
     }
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        cameraUri?.let { value ->
-            val uri = Uri.parse(value)
-            runCatching { MediaFiles.finishCamera(context, uri, success) }.onFailure { vm.notify("照片保存失败") }
-            if (success) vm.addMedia(uri, BlockType.PHOTO)
-        }; cameraUri = null
-    }
+    val camera = rememberLauncherForActivityResult(CapturePhoto()) { success -> vm.finishCamera(success) }
     val photos = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val intent = result.data
@@ -89,7 +82,7 @@ class MainActivity : ComponentActivity() {
     Box(Modifier.fillMaxSize()) {
         DiaryScreens(vm, entries, recording,
             onPhoto = { photos.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { type = "image/*"; addCategory(Intent.CATEGORY_OPENABLE); putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true); putExtra(Intent.EXTRA_LOCAL_ONLY, true); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) }) },
-            onCamera = { try { val uri = MediaFiles.cameraUri(context); cameraUri = uri.toString(); camera.launch(uri) } catch (e: Exception) { vm.notify("没有可用的相机，或无法创建照片") } },
+            onCamera = { vm.prepareCamera { uri -> try { camera.launch(uri) } catch (_: Exception) { vm.finishCamera(false); vm.notify("没有可用的相机，或无法创建照片") } } },
             onRecord = { if (recording) stopRecording() else if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { try { recorder.start(); recording = true } catch (e: Exception) { vm.notify(e.message ?: "无法录音") } } else microphone.launch(Manifest.permission.RECORD_AUDIO) },
             onBackup = { vm.prepareBackup() }, onRestore = { restore.launch(arrayOf("*/*")) },
             onPdf = { list -> pdfSnapshot = list; pdf.launch("日记_${dateText(System.currentTimeMillis(), "yyyyMMdd_HHmm")}.pdf") })

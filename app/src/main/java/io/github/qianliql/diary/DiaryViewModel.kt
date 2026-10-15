@@ -77,6 +77,42 @@ class DiaryViewModel(app: Application, private val savedState: SavedStateHandle)
     }
     fun changeBlock(id: String, block: (Block) -> Block) { editor?.let { e -> change(e.copy(blocks = e.blocks.map { if (it.id == id) block(it) else it })) } }
     fun addBlock(block: Block) { editor?.let { change(it.copy(blocks = it.blocks + block)) } }
+    fun prepareCamera(launch: (Uri) -> Unit) {
+        val draft = editor ?: return
+        val pendingSave = saveJob
+        work("正在打开相机") {
+            pendingSave?.cancelAndJoin(); repository.put(draft)
+            val uri = MediaFiles.cameraUri(getApplication())
+            withContext(Dispatchers.Main) {
+                savedState["cameraUri"] = uri.toString(); savedState["cameraEntryId"] = draft.id
+                launch(uri)
+            }
+        }
+    }
+    fun finishCamera(success: Boolean) {
+        val uri = savedState.get<String>("cameraUri") ?: return
+        val entryId = savedState.get<String>("cameraEntryId") ?: return
+        viewModelScope.launch {
+            busy = true; busyText = "正在保存照片"
+            try {
+                val photo = withContext(Dispatchers.IO) { MediaFiles.finishCamera(getApplication(), Uri.parse(uri), success) }
+                if (photo != null) {
+                    val block = withContext(Dispatchers.IO) { MediaFiles.block(getApplication(), photo.uri, BlockType.PHOTO) }
+                    saveJob?.cancelAndJoin()
+                    val current = editor?.takeIf { it.id == entryId } ?: withContext(Dispatchers.IO) {
+                        repository.refresh(); repository.entries.value.find { it.id == entryId && it.draft }
+                    }
+                    if (current != null) {
+                        val updated = current.copy(blocks = current.blocks + block, updatedAt = System.currentTimeMillis())
+                        withContext(Dispatchers.IO) { repository.put(updated) }
+                        editor = updated; savedState["editorId"] = updated.id
+                    }
+                    if (!photo.inGallery) notify("照片已保存在日记，但未能写入相册，请检查可用空间")
+                }
+            } catch (e: Exception) { notify(e.message ?: "照片保存失败，请重新拍照") }
+            finally { savedState["cameraUri"] = null; savedState["cameraEntryId"] = null; busy = false }
+        }
+    }
     fun addMedia(uri: Uri, type: BlockType, duration: Long = 0) {
         val editorId = editor?.id ?: return
         viewModelScope.launch {
