@@ -30,7 +30,11 @@ def main():
     source = output/f'diary-{version}-source.zip'
     with zipfile.ZipFile(source, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for file, name in source_files(): archive.write(file, 'diary/'+name)
-    files = [apk, source] + [output/name for name in ['使用说明.md','测试报告.md'] if (output/name).exists()]
+    files = [apk, source]
+    # GitHub normalizes non-ASCII asset names; use stable ASCII names on both hosts.
+    for source_name, public_name in [('使用说明.md','USER-GUIDE.md'),('测试报告.md','TEST-REPORT.md')]:
+        if (output/source_name).exists():
+            shutil.copyfile(output/source_name,output/public_name); files.append(output/public_name)
     manifest = {'version':version, 'tag':'v'+version, 'github':'qianliql/diary-releases', 'gitee':'qianlihuo/diary', 'assets':[{'name':p.name, 'bytes':p.stat().st_size, 'sha256':sha(p)} for p in files]}
     (output/'release-manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
     files.append(output/'release-manifest.json')

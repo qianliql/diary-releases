@@ -1,4 +1,4 @@
-# 日记 0.0.0
+# 日记 0.0.1
 
 面向 ColorOS 手机的原生 Android 个人日记，Android 12+，Kotlin + Jetpack Compose + 本机 SQLite。
 
@@ -42,13 +42,13 @@
 
 `tools/prepare_model.py <输入目录> <发布目录>` 对 encoder/decoder 的上游 SHA256 进行校验，再生成可复现模型 ZIP、逐文件校验目录及应用内模型目录。输入目录需包含 `encoder.onnx`、`decoder.onnx`、`tokens.txt`、Whisper 的 `LICENSE.txt`。模型来自 `csukuangfj/sherpa-onnx-whisper-tiny` 的 tiny INT8 文件，语言固定普通话。
 
-模型 ZIP、`model-catalog.json`、许可文件发布至 `qianliql/diary-releases` 的 `models-v1` Release。APK 发布使用版本标签，系统安装器负责覆盖更新。`UpdateClient` 读取最新非预发布版本；首个预发布测试包不会被视为稳定更新。
+模型 ZIP、`model-catalog.json`、许可文件发布至 `qianliql/diary-releases` 的 `models-v1` Release，并在 Gitee 提供同文件附件。APK 发布使用版本标签，系统安装器负责覆盖更新。手动更新检查会识别应用的数字版本标签（包括预览版本），跳过模型标签和草稿，选择较高版本。
 
 基础 APK 不包含 `.onnx` 权重。模型存入 `noBackupFilesDir/speech-model`，完全排除于手动备份。下载采用临时目录和完整 SHA256 校验，安装成功才替换旧模型；失败或取消时保留原模型。
 
 ## 数据格式
 
-数据库版本 1，日记与内容块使用稳定 UUID。备份格式 `DIARYBK1`，PBKDF2-HMAC-SHA256（600,000 次）、随机盐及 AES-256-GCM 认证加密，恢复到临时文件并验证认证标签后才导入。
+数据库版本 1，日记与内容块使用稳定 UUID。0.0.1 的新备份格式 `DIARYBK2`：PBKDF2-HMAC-SHA256（600,000 次）派生密钥，随机盐与每段唯一 nonce；64 KiB AES-256-GCM 分段认证。认证数据绑定头部、段号与长度，并要求认证的空结束段，拒绝截断、调换和追加内容。这样 Android 加密组件最多缓存一段，避免将整份照片备份放入内存。所有段与结束标记通过认证后才导入数据库。仍可读取 0.0.0 的 `DIARYBK1` 备份；0.0.0 无法读取新版备份。
 
 媒体按 SHA256 去重，档案格式版本化。合并按日记原始标识和规范化内容指纹判断，相同跳过、冲突复制并标注备份来源，重复导入相同冲突版本保持幂等。语音模型不进入备份。
 

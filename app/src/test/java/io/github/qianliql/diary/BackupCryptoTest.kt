@@ -23,4 +23,23 @@ class BackupCryptoTest {
         assertThrows(Exception::class.java) { BackupCrypto.decrypt(data.inputStream(), ByteArrayOutputStream(), password) }
     }
     @Test fun rejectsShortPassword() { assertThrows(IllegalArgumentException::class.java) { BackupCrypto.encrypt("x".byteInputStream(), ByteArrayOutputStream(), "short".toCharArray()) } }
+    @Test fun framesRejectTruncationReorderingAndTrailingBytes() {
+        val output = ByteArrayOutputStream(); BackupCrypto.encrypt(ByteArray(65536 * 2 + 17).inputStream(), output, password)
+        val bytes = output.toByteArray(); val frameSize = 65536 + 20
+        val reordered = bytes.copyOfRange(0, 36) + bytes.copyOfRange(36 + frameSize, 36 + frameSize * 2) + bytes.copyOfRange(36, 36 + frameSize) + bytes.copyOfRange(36 + frameSize * 2, bytes.size)
+        for (invalid in listOf(bytes.copyOf(bytes.size - 20), reordered, bytes + byteArrayOf(1))) {
+            assertThrows(Exception::class.java) { BackupCrypto.decrypt(invalid.inputStream(), ByteArrayOutputStream(), password) }
+        }
+    }
+    @Test fun restoresVersionOneBackups() {
+        val salt = ByteArray(16) { it.toByte() }; val iv = ByteArray(12) { (it + 20).toByte() }
+        val header = "DIARYBK1".toByteArray() + salt + iv
+        val spec = javax.crypto.spec.PBEKeySpec(password, salt, 600000, 256)
+        val key = javax.crypto.spec.SecretKeySpec(javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded, "AES")
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key, javax.crypto.spec.GCMParameterSpec(128, iv)); cipher.updateAAD(header)
+        val original = "0.0.0 备份可恢复".toByteArray(); val output = ByteArrayOutputStream()
+        BackupCrypto.decrypt((header + cipher.doFinal(original)).inputStream(), output, password)
+        assertArrayEquals(original, output.toByteArray())
+    }
 }

@@ -60,6 +60,9 @@ def publish(platform, client, manifest, directory, notes, stable=False):
         if name in by_name:
             # Verify existing bytes before accepting a partial rerun. Never replace a published artifact.
             asset = by_name[name]
+            if asset.get('digest') == 'sha256:'+digest(path):
+                print(platform+': verified '+name,flush=True)
+                continue
             url = asset.get('browser_download_url') or asset.get('download_url')
             assert url and urllib.parse.urlparse(url).scheme == 'https', 'Cannot verify existing attachment'
             with urllib.request.urlopen(url,timeout=240) as response:

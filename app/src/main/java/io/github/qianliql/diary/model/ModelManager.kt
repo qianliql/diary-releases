@@ -131,13 +131,12 @@ fun trustedConnection(address: String): HttpURLConnection {
 object UpdateClient {
     const val RELEASE_PAGE = "https://github.com/qianliql/diary-releases/releases"
     suspend fun check(current: Long): String? = withContext(Dispatchers.IO) {
-        val c = trustedConnection("https://api.github.com/repos/qianliql/diary-releases/releases/latest")
+        val c = trustedConnection("https://api.github.com/repos/qianliql/diary-releases/releases?per_page=100")
         try {
             if (c.responseCode == 404) return@withContext null
             require(c.responseCode == 200) { "暂时无法检查更新，请稍后重试" }
             val data = c.inputStream.bufferedReader().use { it.readText() }; require(data.length < 1_000_000)
-            val release = JSONObject(data); val code = release.optString("tag_name").removePrefix("v").split('.').let { p -> 1 + (p.getOrNull(0)?.toLongOrNull() ?: 0) * 10000 + (p.getOrNull(1)?.toLongOrNull() ?: 0) * 100 + (p.getOrNull(2)?.toLongOrNull() ?: 0) }
-            if (code > current) release.getString("html_url").also { require(it.startsWith("https://github.com/qianliql/diary-releases/")) } else null
+            ReleaseVersions.newer(org.json.JSONArray(data), current)
         } finally { c.disconnect() }
     }
 }
